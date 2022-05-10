@@ -94,37 +94,7 @@ pub fn instantiate(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> StdResult<Response> {
-    store_dynrate_config(
-        deps.storage,
-        &DynrateConfig {
-            dyn_rate_epoch: msg.dyn_rate_epoch,
-            dyn_rate_maxchange: msg.dyn_rate_maxchange,
-            dyn_rate_yr_increase_expectation: msg.dyn_rate_yr_increase_expectation,
-            dyn_rate_min: msg.dyn_rate_min,
-            dyn_rate_max: msg.dyn_rate_max,
-        },
-    )?;
-    let mut config = read_config(deps.storage)?;
-    let prev_yield_reserve = query_balance(
-        deps.as_ref(),
-        env.contract.address.clone(),
-        config.stable_denom.clone(),
-    )?;
-    store_dynrate_state(
-        deps.storage,
-        &DynrateState {
-            last_executed_height: env.block.height,
-            prev_yield_reserve: Decimal256::from_ratio(prev_yield_reserve, 1),
-        },
-    )?;
-    let new_rate = max(
-        min(config.threshold_deposit_rate, msg.dyn_rate_max),
-        msg.dyn_rate_min,
-    );
-    config.threshold_deposit_rate = new_rate;
-    config.target_deposit_rate = new_rate;
-
+pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response> {
     // vterra migration
     crate::migrations::migrate(deps, msg)?;
     Ok(Response::default())

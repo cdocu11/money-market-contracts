@@ -49,7 +49,7 @@ pub(crate) fn migrate(deps: DepsMut, block_height: u64, msg: MigrateMsg) -> StdR
             global_reward_index: old_state.global_reward_index,
             anc_emission_rate: old_state.anc_emission_rate,
             prev_aterra_supply: old_state.prev_aterra_supply,
-            prev_aterra_exchange_rate: old_state.prev_aterra_exchange_rate,
+            prev_aterra_exchange_rate: old_state.prev_exchange_rate,
             // new
             prev_ve_premium_rate: vterra_state.premium_rate,
             prev_vterra_exchange_rate: vterra_state.prev_epoch_vterra_exchange_rate,
@@ -85,7 +85,7 @@ struct OldState {
     pub global_reward_index: Decimal256,
     pub anc_emission_rate: Decimal256,
     pub prev_aterra_supply: Uint256,
-    pub prev_aterra_exchange_rate: Decimal256,
+    pub prev_exchange_rate: Decimal256,
 }
 
 fn read_old_config(storage: &dyn Storage) -> StdResult<OldConfig> {
