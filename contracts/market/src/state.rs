@@ -46,7 +46,7 @@ pub struct State {
     pub prev_vterra_exchange_rate: Decimal256,
     pub vterra_exchange_rate_last_updated: u64,
     /// Premium rate in blocks. Updated during epoch update
-    pub prev_ve_premium_rate: Decimal256,
+    pub prev_vterra_premium_rate: Decimal256,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

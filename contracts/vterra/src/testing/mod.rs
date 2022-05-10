@@ -118,7 +118,7 @@ fn unbond_simple() {
     let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: MOCK_USER.to_string(),
         amount: Uint128::from(10_000u64),
-        msg: to_binary(&Cw20HookMsg::UnbondVeATerra {}).unwrap(),
+        msg: to_binary(&Cw20HookMsg::UnbondVTerra {}).unwrap(),
     });
     let info = mock_info(VTERRA_CONTRACT, &[]);
     let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();

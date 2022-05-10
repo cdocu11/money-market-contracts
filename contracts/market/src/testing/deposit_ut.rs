@@ -36,7 +36,7 @@ fn proper_compute_exchange_rate() {
         &[(&MOCK_CONTRACT_ADDR.to_string(), &Uint128::from(1000000u128))],
     )]);
 
-    let mock_state = State {
+    let mut mock_state = State {
         total_liabilities: Decimal256::from_uint256(50000u128),
         total_reserves: Decimal256::from_uint256(550000u128),
         last_interest_updated: env.block.height,
@@ -54,7 +54,7 @@ fn proper_compute_exchange_rate() {
         deps.as_ref(),
         env.block.height,
         &mock_config,
-        &mock_state,
+        &mut mock_state,
         mock_deposit_amount,
     )
     .unwrap();

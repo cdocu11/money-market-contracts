@@ -85,7 +85,7 @@ pub fn instantiate(
             prev_vterra_supply: Uint256::zero(),
             prev_vterra_exchange_rate: Decimal256::one(),
             vterra_exchange_rate_last_updated: env.block.height,
-            prev_ve_premium_rate: Decimal256::zero(),
+            prev_vterra_premium_rate: Decimal256::zero(),
         },
     )?;
 
@@ -131,6 +131,8 @@ pub fn execute(
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
+    eprint!("");
+    dbg!("Top of market execute");
     match msg {
         ExecuteMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
         ExecuteMsg::RegisterContracts {
@@ -385,7 +387,7 @@ pub fn execute_epoch_operations(
     let mut state: State = read_state(deps.storage)?;
 
     // Fetch premium rate from vterra anchor contract
-    state.prev_ve_premium_rate = query_premium_rate(
+    state.prev_vterra_premium_rate = query_premium_rate(
         deps.as_ref(),
         deps.api.addr_humanize(&config.vterra_anchor_contract)?,
     )?;
@@ -425,7 +427,7 @@ pub fn execute_epoch_operations(
 
     // recompute prev_exchange_rate with distributed_interest
     state.prev_aterra_exchange_rate = compute_exchange_rate_raw(
-        &state,
+        &mut state,
         env.block.height,
         aterra_supply,
         vterra_supply,
@@ -577,7 +579,7 @@ pub fn query_state(deps: Deps, env: Env, block_height: Option<u64>) -> StdResult
         prev_vterra_supply: state.prev_vterra_supply,
         prev_vterra_exchange_rate: state.prev_vterra_exchange_rate,
         vterra_exchange_rate_last_updated: state.vterra_exchange_rate_last_updated,
-        prev_ve_premium_rate: state.prev_ve_premium_rate,
+        prev_ve_premium_rate: state.prev_vterra_premium_rate,
     })
 }
 
@@ -630,9 +632,10 @@ pub fn query_epoch_state(
 
     // compute_interest_raw store current exchange rate
     // as prev_exchange_rate, so just return prev_exchange_rate
+    let block_height = block_height.unwrap_or(state.vterra_exchange_rate_last_updated);
     let exchange_rate = compute_exchange_rate_raw(
-        &state,
-        block_height.unwrap_or(state.vterra_exchange_rate_last_updated),
+        &mut state,
+        block_height,
         aterra_supply,
         vterra_supply,
         balance + distributed_interest,

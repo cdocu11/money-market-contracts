@@ -252,7 +252,7 @@ pub fn claim_unlocked_aterra(
 /// Exchange rate of aterra / vterra
 /// ex: 1 ve * ER => ER aterra
 pub(crate) fn compute_ve_exchange_rate(state: &State, block_height: u64) -> Decimal256 {
-    moneymarket::vterra::compute_ve_exchange_rate(
+    moneymarket::vterra::compute_vterra_exchange_rate(
         state.prev_epoch_vterra_exchange_rate,
         state.premium_rate,
         state.last_updated,

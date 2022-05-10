@@ -51,7 +51,7 @@ pub(crate) fn migrate(deps: DepsMut, block_height: u64, msg: MigrateMsg) -> StdR
             prev_aterra_supply: old_state.prev_aterra_supply,
             prev_aterra_exchange_rate: old_state.prev_exchange_rate,
             // new
-            prev_ve_premium_rate: vterra_state.premium_rate,
+            prev_vterra_premium_rate: vterra_state.premium_rate,
             prev_vterra_exchange_rate: vterra_state.prev_epoch_vterra_exchange_rate,
             prev_vterra_supply: vterra_state.vterra_supply,
             vterra_exchange_rate_last_updated: block_height,
