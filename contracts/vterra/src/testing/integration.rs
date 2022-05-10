@@ -1,7 +1,7 @@
 use cosmwasm_bignumber::Decimal256;
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
-use cosmwasm_std::{coins, to_binary, Addr};
-use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg};
+use cosmwasm_std::{coins, to_binary, Addr, Uint128};
+use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg, TokenInfoResponse};
 use moneymarket::market::{
     Cw20HookMsg as MarketCw20HookMsg, ExecuteMsg as MarketExecuteMsg,
     MigrateMsg as MarketMigrateMsg,
@@ -10,9 +10,10 @@ use moneymarket::overseer::{
     ConfigResponse as OverseerConfigResponse, ExecuteMsg as OverserrExecuteMsg,
     MigrateMsg as OverseerMigrateMsg, QueryMsg as OverseerQueryMsg,
 };
+use moneymarket::vterra as vterra_package;
 use moneymarket::vterra::{
-    ConfigResponse as VterraConfigResponse, InstantiateMsg as VterraInstantiateMsg,
-    QueryMsg as VterraQueryMsg,
+    ConfigResponse as VterraConfigResponse, ExecuteMsg as VterraExecuteMsg,
+    InstantiateMsg as VterraInstantiateMsg, QueryMsg as VterraQueryMsg,
 };
 use moneymarket_old::distribution_model::InstantiateMsg as DistributionModelInstantiateMsgOld;
 use moneymarket_old::interest_model::InstantiateMsg as InterestModelInstantiateMsgOld;
@@ -24,6 +25,8 @@ use moneymarket_old::oracle::InstantiateMsg as OracleInstantiateMsgOld;
 use moneymarket_old::overseer::InstantiateMsg as OverseerInstantiateMsgOld;
 use std::str::FromStr;
 use terra_multi_test::{AppBuilder, BankKeeper, ContractWrapper, Executor, TerraApp, TerraMock};
+
+use crate::bonding::UNBOND_DURATION_SECS;
 
 const ADMIN: &str = "admin";
 const OWNER: &str = "owner";
@@ -337,12 +340,12 @@ fn create_new_contract(app: &mut TerraApp, mut addresses: Addresses) -> Addresse
         target_share: Decimal256::percent(80),
         max_pos_change: Decimal256::permille(1),
         max_neg_change: Decimal256::permille(1),
-        max_rate: Decimal256::from_str("1.20").unwrap(),
-        min_rate: Decimal256::from_str("1.01").unwrap(),
+        max_rate: yearly_rate_to_block_rate(1.2),
+        min_rate: yearly_rate_to_block_rate(1.01),
         diff_multiplier: Decimal256::percent(5),
-        initial_premium_rate: Decimal256::percent(2),
+        initial_premium_rate: yearly_rate_to_block_rate(1.01),
         premium_rate_epoch: 10,
-        min_gross_rate: Decimal256::from_str("1.185").unwrap(),
+        min_gross_rate: yearly_rate_to_block_rate(1.175),
     };
 
     addresses.vterra_addr = Some(
@@ -431,6 +434,8 @@ fn deposit_aterra_and_withdraw() {
     let overseer_addr = addresses.overseer_addr.unwrap();
     let aterra_cw20_addr = addresses.aterra_cw20_addr.unwrap();
 
+    dbg!(yearly_rate_to_block_rate(1.20).to_string());
+
     // give the user 101 UST
     app.init_bank_balance(&user, coins(101_000_000, "uust"))
         .unwrap();
@@ -457,7 +462,6 @@ fn deposit_aterra_and_withdraw() {
         b.height += epoch_period;
     });
     let msg = OverserrExecuteMsg::ExecuteEpochOperations {};
-    // @TODO: fix the overflow error
     app.execute_contract(user.clone(), overseer_addr.clone(), &msg, &[])
         .unwrap();
 
@@ -487,4 +491,176 @@ fn deposit_aterra_and_withdraw() {
         app.wrap().query_all_balances(user).unwrap(),
         coins(101_000_000, "uust")
     );
+}
+
+#[test]
+fn bond_unbond_claim_vterra() {
+    let mut app = mock_app();
+    let addresses = proper_initialization(&mut app);
+    let user = Addr::unchecked(USER);
+    let market_addr = addresses.market_addr.unwrap();
+    let overseer_addr = addresses.overseer_addr.unwrap();
+    let aterra_cw20_addr = addresses.aterra_cw20_addr.unwrap();
+    let vterra_addr = addresses.vterra_addr.unwrap();
+    let vterra_cw20_addr = addresses.vterra_cw20_addr.unwrap();
+
+    dbg!(yearly_rate_to_block_rate(1.20).to_string());
+
+    // give the user 101 UST
+    app.init_bank_balance(&user, coins(101_000_000, "uust"))
+        .unwrap();
+
+    // deposit 100 UST to get aUST
+    let msg = MarketExecuteMsg::DepositStable {};
+    app.execute_contract(
+        user.clone(),
+        market_addr.clone(),
+        &msg,
+        &coins(100_000_000, "uust"),
+    )
+    .unwrap();
+
+    dbg!("here");
+    // query epoch_period of overseer
+    let res: OverseerConfigResponse = app
+        .wrap()
+        .query_wasm_smart(overseer_addr.clone(), &OverseerQueryMsg::Config {})
+        .unwrap();
+    let epoch_period = res.epoch_period;
+
+    // call overseer's ExecuteEpochOperations every epoch_period blocks
+    app.update_block(|b| {
+        b.height += epoch_period;
+    });
+    let msg = OverserrExecuteMsg::ExecuteEpochOperations {};
+    app.execute_contract(user.clone(), overseer_addr.clone(), &msg, &[])
+        .unwrap();
+
+    dbg!("here");
+    // bond aterra -> vterra
+    let aterra_balance: BalanceResponse = app
+        .wrap()
+        .query_wasm_smart(
+            aterra_cw20_addr.clone(),
+            &Cw20QueryMsg::Balance {
+                address: user.to_string(),
+            },
+        )
+        .unwrap();
+
+    let aterra_info: TokenInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            aterra_cw20_addr.clone(),
+            &Cw20QueryMsg::TokenInfo {  },
+        )
+        .unwrap();
+    dbg!(aterra_info);
+
+    let aterra_to_transfer = aterra_balance.balance / Uint128::from(2u8);
+    app.execute_contract(
+        user.clone(),
+        aterra_cw20_addr.clone(),
+        &Cw20ExecuteMsg::Send {
+            contract: vterra_addr.to_string(),
+            amount: aterra_to_transfer,
+            msg: to_binary(&vterra_package::Cw20HookMsg::BondATerra {}).unwrap(),
+        },
+        &[],
+    )
+    .unwrap();
+
+    let aterra_info: TokenInfoResponse = app
+        .wrap()
+        .query_wasm_smart(
+            aterra_cw20_addr.clone(),
+            &Cw20QueryMsg::TokenInfo {  },
+        )
+        .unwrap();
+    dbg!(aterra_info);
+
+    dbg!("here");
+
+    // call overseer's ExecuteEpochOperations every epoch_period blocks
+    app.update_block(|b| {
+        b.height += epoch_period;
+    });
+    let msg = OverserrExecuteMsg::ExecuteEpochOperations {};
+    app.execute_contract(user.clone(), overseer_addr.clone(), &msg, &[])
+        .unwrap();
+
+    dbg!("here");
+    let vterra_balance: BalanceResponse = app
+        .wrap()
+        .query_wasm_smart(
+            vterra_cw20_addr.clone(),
+            &Cw20QueryMsg::Balance {
+                address: user.to_string(),
+            },
+        )
+        .unwrap();
+
+    app.execute_contract(
+        user.clone(),
+        aterra_cw20_addr.clone(),
+        &Cw20ExecuteMsg::Send {
+            contract: vterra_addr.to_string(),
+            amount: vterra_balance.balance,
+            msg: to_binary(&vterra_package::Cw20HookMsg::UnbondVTerra {}).unwrap(),
+        },
+        &[],
+    )
+    .unwrap();
+
+    dbg!("here");
+    // call overseer's ExecuteEpochOperations every epoch_period blocks
+    app.update_block(|b| {
+        b.height += UNBOND_DURATION_SECS / 6;
+        b.time.plus_seconds(UNBOND_DURATION_SECS);
+    });
+    let msg = OverserrExecuteMsg::ExecuteEpochOperations {};
+    app.execute_contract(user.clone(), overseer_addr.clone(), &msg, &[])
+        .unwrap();
+
+    app.execute_contract(
+        user.clone(),
+        aterra_cw20_addr.clone(),
+        &vterra_package::ExecuteMsg::ClaimATerra { amount: None },
+        &[],
+    )
+    .unwrap();
+
+    // query user's amount of aUST
+    let res: BalanceResponse = app
+        .wrap()
+        .query_wasm_smart(
+            aterra_cw20_addr.clone(),
+            &Cw20QueryMsg::Balance {
+                address: user.to_string(),
+            },
+        )
+        .unwrap();
+    let aterra_balance = res.balance;
+
+    // redeem all his deposited UST
+    let msg = Cw20ExecuteMsg::Send {
+        contract: market_addr.to_string(),
+        amount: aterra_balance,
+        msg: to_binary(&MarketCw20HookMsg::RedeemStable {}).unwrap(),
+    };
+    app.execute_contract(user.clone(), aterra_cw20_addr.clone(), &msg, &[])
+        .unwrap();
+
+    // check user's UST balance
+    assert_eq!(
+        app.wrap().query_all_balances(user).unwrap(),
+        coins(101_000_000, "uust")
+    );
+}
+
+const blocks_per_year: u128 = 365 * 24 * 60 * 60 / 6; // assumes 6 second block time
+
+fn yearly_rate_to_block_rate(yearly: f64) -> Decimal256 {
+    let block_as_float = yearly.powf(1. / blocks_per_year as f64);
+    Decimal256::from_str(&block_as_float.to_string()).unwrap()
 }

@@ -8,6 +8,7 @@ use moneymarket::interest_model::BorrowRateResponse;
 use moneymarket::market::{BorrowerInfoResponse, BorrowerInfosResponse};
 use moneymarket::overseer::BorrowLimitResponse;
 use moneymarket::querier::{deduct_tax, query_balance, query_supply};
+use moneymarket::vterra::compute_vterra_exchange_rate;
 
 use crate::deposit::compute_exchange_rate_raw;
 use crate::error::ContractError;
@@ -313,7 +314,8 @@ pub fn compute_interest_raw(
 
     let mut exchange_rate =
         compute_exchange_rate_raw(state, block_height, aterra_supply, vterra_supply, balance);
-    let effective_deposit_rate = exchange_rate / state.prev_aterra_exchange_rate;
+    dbg!(&exchange_rate, state.prev_aterra_exchange_rate);
+    let effective_deposit_rate = dbg!(exchange_rate / state.prev_aterra_exchange_rate);
     let deposit_rate = (effective_deposit_rate - Decimal256::one()) / passed_blocks;
 
     if deposit_rate > target_deposit_rate {

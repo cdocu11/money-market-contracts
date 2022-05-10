@@ -35,7 +35,7 @@ pub(crate) fn get_mock_state() -> State {
         prev_vterra_supply: Uint256::zero(),
         prev_vterra_exchange_rate: Decimal256::one(),
         vterra_exchange_rate_last_updated: mock_env().block.height,
-        prev_ve_premium_rate: Decimal256::percent(0),
+        prev_vterra_premium_rate: Decimal256::percent(0),
     }
 }
 

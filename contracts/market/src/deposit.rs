@@ -6,7 +6,7 @@ use cosmwasm_std::{
 use cw20::Cw20ExecuteMsg;
 
 use moneymarket::querier::{deduct_tax, query_balance, query_supply};
-use moneymarket::vterra::compute_ve_exchange_rate;
+use moneymarket::vterra::compute_vterra_exchange_rate;
 
 use crate::borrow::{compute_interest, compute_reward};
 use crate::error::ContractError;
@@ -48,7 +48,7 @@ pub fn deposit_stable(
         deps.as_ref(),
         env.block.height,
         &config,
-        &state,
+        &mut state,
         Some(deposit_amount),
     )?;
     let mint_amount = deposit_amount / exchange_rate;
@@ -87,7 +87,7 @@ pub fn redeem_stable(
 
     // Load anchor token exchange rate with updated state
     let exchange_rate =
-        compute_exchange_rate(deps.as_ref(), env.block.height, &config, &state, None)?;
+        compute_exchange_rate(deps.as_ref(), env.block.height, &config, &mut state, None)?;
     let redeem_amount = Uint256::from(burn_amount) * exchange_rate;
 
     let current_balance = query_balance(
@@ -149,7 +149,7 @@ pub(crate) fn compute_exchange_rate(
     deps: Deps,
     block_height: u64,
     config: &Config,
-    state: &State,
+    state: &mut State,
     deposit_amount: Option<Uint256>,
 ) -> StdResult<Decimal256> {
     let aterra_supply = query_supply(deps, deps.api.addr_humanize(&config.aterra_contract)?)?;
@@ -159,6 +159,7 @@ pub(crate) fn compute_exchange_rate(
         deps.api.addr_humanize(&config.contract_addr)?,
         config.stable_denom.to_string(),
     )? - deposit_amount.unwrap_or_else(Uint256::zero);
+
 
     Ok(compute_exchange_rate_raw(
         state,
@@ -170,7 +171,7 @@ pub(crate) fn compute_exchange_rate(
 }
 
 pub fn compute_exchange_rate_raw(
-    state: &State,
+    state: &mut State,
     block_height: u64,
     aterra_supply: Uint256,
     vterra_supply: Uint256,
@@ -180,17 +181,21 @@ pub fn compute_exchange_rate_raw(
         return Decimal256::one();
     }
 
-    let ve_er = compute_ve_exchange_rate(
+    let vterra_exchange_rate = compute_vterra_exchange_rate(
         state.prev_vterra_exchange_rate,
-        state.prev_ve_premium_rate,
-        state.vterra_exchange_rate_last_updated,
-        block_height,
+        state.prev_vterra_premium_rate,
+        dbg!(state.vterra_exchange_rate_last_updated),
+        dbg!(block_height),
     );
-    let converted_ve = Decimal256::from_uint256(vterra_supply) * ve_er;
-    let effectivterra_supply = Decimal256::from_uint256(aterra_supply) + converted_ve;
+    state.prev_vterra_exchange_rate = vterra_exchange_rate;
+    state.vterra_exchange_rate_last_updated = block_height;
+
+    let converted_ve = Decimal256::from_uint256(vterra_supply) * vterra_exchange_rate;
+    let effective_aterra_supply = Decimal256::from_uint256(aterra_supply) + converted_ve;
+    dbg!(converted_ve.to_string(), aterra_supply.to_string(), effective_aterra_supply.to_string());
 
     // (aterra / stable_denom)
     // exchange_rate = (balance + total_liabilities - total_reserves) / aterra_supply
     (Decimal256::from_uint256(contract_balance) + state.total_liabilities - state.total_reserves)
-        / effectivterra_supply
+        / effective_aterra_supply
 }

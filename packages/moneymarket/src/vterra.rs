@@ -83,7 +83,7 @@ pub enum Cw20HookMsg {
     BondATerra {},
 
     /// Burn vterra and entitle sender to claim corresponding aterra after 30 day waiting period
-    UnbondVeATerra {},
+    UnbondVTerra {},
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -132,7 +132,7 @@ pub struct StateResponse {
 
 /// Exchange rate of aterra / vterra
 /// ex: 1 ve * ER => ER aterra
-pub fn compute_ve_exchange_rate(
+pub fn compute_vterra_exchange_rate(
     previous_er: Decimal256,
     premium_rate: Decimal256,
     last_updated: u64,
@@ -142,14 +142,28 @@ pub fn compute_ve_exchange_rate(
     if blocks_elapsed == 0 {
         previous_er
     } else {
-        previous_er * pow(premium_rate, blocks_elapsed)
+        dbg!("");
+        dbg!(blocks_elapsed);
+        dbg!(previous_er);
+        dbg!(premium_rate);
+        dbg!(previous_er * dbg!(pow(premium_rate, blocks_elapsed)))
     }
 }
 
 pub fn pow(base: Decimal256, power: u64) -> Decimal256 {
-    let mut acc = Decimal256::one();
-    for _ in 0..power {
-        acc = acc * base
-    }
-    acc
+    pow_by_squaring(base, power)
+    // let mut acc = Decimal256::one();
+    // for _ in 0..power {
+    //     acc = acc * base;
+    // }
+    // acc
+}
+
+fn pow_by_squaring(x: Decimal256, n: u64) -> Decimal256 {
+    match n {
+        0 => Decimal256::one(),
+        1 => x,
+        i if i % 2 == 0 => pow_by_squaring(x * x, n / 2),
+        _ => x * pow_by_squaring(x * x, (n - 1) / 2),
+    }     
 }
