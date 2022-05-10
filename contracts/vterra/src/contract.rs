@@ -64,7 +64,7 @@ pub fn instantiate(
                 admin: None,
                 code_id: msg.vterra_code_id,
                 funds: vec![],
-                label: "".to_string(),
+                label: "vterra".to_string(),
                 msg: to_binary(&TokenInstantiateMsg {
                     name: format!(
                         "Vote Escrow Anchor Terra {}",

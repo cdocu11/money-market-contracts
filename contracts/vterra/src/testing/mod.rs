@@ -17,6 +17,7 @@ use crate::state::{
 };
 use crate::testing::mock_querier::mock_dependencies;
 
+mod integration;
 mod mock_querier;
 
 const MOCK_USER: &str = "addr0000";

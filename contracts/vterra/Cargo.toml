@@ -47,6 +47,17 @@ terraswap = "2.3.0"
 [dev-dependencies]
 cosmwasm-schema = "0.16.0"
 terra-cosmwasm = "2.2.0"
+terra-multi-test = { git = "https://github.com/astroport-fi/terra-plus.git", tag = "v0.9.1-terra" }
+vterra = { path = "./" }
+moneymarket-old = { git = "https://github.com/Anchor-Protocol/money-market-contracts.git", branch = "dev/vUST" }
+moneymarket-market-old = { git = "https://github.com/Anchor-Protocol/money-market-contracts.git", branch = "dev/vUST" }
+moneymarket-overseer-old = { git = "https://github.com/Anchor-Protocol/money-market-contracts.git", branch = "dev/vUST" }
+moneymarket-oracle-old = { git = "https://github.com/Anchor-Protocol/money-market-contracts.git", branch = "dev/vUST" }
+moneymarket-interest-model-old = { git = "https://github.com/Anchor-Protocol/money-market-contracts.git", branch = "dev/vUST" }
+moneymarket-distribution-model-old = { git = "https://github.com/Anchor-Protocol/money-market-contracts.git", branch = "dev/vUST" }
+cw20-base = { version = "0.8", features = ["library"] }
+moneymarket-market = { path = "../market" }
+moneymarket-overseer = { path = "../overseer" }
 
 [profile.dev]
 overflow-checks = true
